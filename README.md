@@ -162,9 +162,13 @@ be reported as a verdict about a person.
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human | 0.00 – 0.35 | We think this was probably written by a person. |
-| unsure | 0.35 – 0.65 | We couldn't tell with confidence whether this was written by a person or by AI. This is not an accusation — it only means the writing doesn't clearly match either pattern, so it needs a human look before anyone acts on it. |
-| high-confidence AI | 0.65 – 1.00 | We think this was probably written by AI. |
+| high-confidence human | 0.00 – 0.50 | We think this was probably written by a person. |
+| unsure | 0.50 – 0.60 | We couldn't tell with confidence whether this was written by a person or by AI. This is not an accusation — it only means the writing doesn't clearly match either pattern, so it needs a human look before anyone acts on it. |
+| high-confidence AI | 0.60 – 1.00 | We think this was probably written by AI. |
+
+> Ranges updated in unit 8: the original 0.35/0.65 band was recalibrated
+> to 0.50/0.60 as the one improvement (see "The Improvement" below). The
+> label texts did not change.
 
 **Why I worded the "unsure" one this way:**
 It has to admit uncertainty without sounding like an accusation, because
@@ -296,45 +300,96 @@ they are not the author's own writing.
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 10 per minute, 200 per day
 
 **Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+A real writer submits their own work a few times an hour — 10 a minute
+never touches them. A script sending a thousand variations to map the
+thresholds would need 100 minutes just to get through the minute buckets
+and would hit the 200-a-day cap long before finishing the map. The numbers
+are the starter defaults, kept deliberately: raising the minute limit
+would let a threshold-mapping script finish in one sitting, and lowering
+it would start blocking real writers who resubmit after an edit or two.
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
-differently — one script can look like a thousand callers, and one household
-can look like one. -->
+**What a caller counts as:** Per `creator_id` when the request supplies a
+non-empty one, else per IP address (`app.py::rate_limit_key`). They fail
+differently: one script can look like a thousand callers if it rotates
+creator_id (which is why the full attack set, with one creator per attack,
+never trips the limit), and one household or classroom behind one address
+can look like one caller if creator_id is missing.
 
 **The run of status codes when I pushed past it:**
 
-<!-- python run_attacks.py --flood 15 -->
-
+```text
+python run_attacks.py --flood 15
+200 200 200 200 200 200 200 200 200 200 429 429 429 429 429
 ```
 
-```
+10 submissions accepted, then 5 rate-limited. The 429s were recorded in
+the audit log as rejections with reason `rate_limited` — an attack that
+shows up only as an absence is one nobody can find later. Full record:
+`results/flood_2026-10-28_2311.md`.
 
 ---
 
 ## Attack Run — Before
 
-<!-- Every attack with its outcome and a held-or-broke mark.
-     `run_attacks.py --label before` produces the table. -->
+Full record: `results/attack_run_2026-10-28_2311_before.md` (15 attacks, 0
+auto-BROKE, 15 judged by hand). The attack set is locally constructed in
+`attacks/` — the course's official CSVs were not present in this workspace
+— covering the families the harness names: evasion, false_positive,
+malformed, flood_same_creator. One harness limit found while building it:
+the CSV reader's 128KB field limit caps the malformed huge body at 50,000
+characters (still over the route's 20,000 limit, so the rejection is real).
 
+Judgment rule for evasion, stated before the marks: an evasion counts as
+BROKE if it lands in the human band, or if it drags the combined score at
+least 0.20 toward human from the unattacked base text (0.6157). A label
+that does not move is HELD; a score that moves a lot without flipping the
+label is a near miss, and it is named as one.
 
+| ID | Family | Before (guess, combined) | Verdict |
+|---|---|---|---|
+| EV01 | evasion (typos) | unsure, 0.379 | BROKE |
+| EV02 | evasion (split sentences) | unsure, 0.432 | HELD (near miss) |
+| EV03 | evasion (quote paste) | unsure, 0.549 | HELD |
+| EV04 | evasion (punctuation) | unsure, 0.554 | HELD |
+| EV05 | evasion (light edit) | unsure, 0.599 | HELD |
+| FP01 | false_positive (plain simple prose) | ai, 0.709 | BROKE |
+| FP02 | false_positive (second-language plain prose) | unsure, 0.623 | HELD (near miss) |
+| FP03 | false_positive (short plain note) | unsure, 0.571 | HELD |
+| MF01–MF05 | malformed | 400 × 5 | HELD |
+| FL01–FL02 | flood_same_creator | 200 × 2 | HELD |
+
+FL01/FL02 are not a break: two requests from one creator cannot trip a
+10-per-minute limit, and the limit itself was proven by the flood run
+above. The full attack set deliberately uses one creator per attack, so it
+cannot test the limiter — that is what `--flood` is for.
 
 **Ten audit log entries from the run**
 
-<!-- Choose entries that show the interesting failures, not the ten easiest. -->
-
 ```json
-
+{"timestamp": "2026-10-28T23:11:43+00:00", "content_id": "e9077ac539d54356af71e478224eb016", "creator_id": "attacker_FP01", "guess": "ai", "model_score": 0.9102, "style_score": 0.5085, "combined_score": 0.7093, "status": "decided"}
+{"timestamp": "2026-10-28T23:11:41+00:00", "content_id": "54aec4c7a2fe45078b87279edf869fd7", "creator_id": "attacker_EV01", "guess": "unsure", "model_score": 0.327, "style_score": 0.4309, "combined_score": 0.379, "status": "decided"}
+{"timestamp": "2026-10-28T23:11:41+00:00", "content_id": "97a451ee4b6b47cead44425f42f9ac53", "creator_id": "attacker_EV02", "guess": "unsure", "model_score": 0.4883, "style_score": 0.3752, "combined_score": 0.4317, "status": "decided"}
+{"timestamp": "2026-10-28T23:11:43+00:00", "content_id": "b1f5a3e339ed4f4c888dd8edf30ec8e3", "creator_id": "attacker_EV05", "guess": "unsure", "model_score": 0.7603, "style_score": 0.4378, "combined_score": 0.5991, "status": "decided"}
+{"timestamp": "2026-10-28T23:11:44+00:00", "content_id": "ef24b2ff620e404fa4a9dacd68e93050", "creator_id": "attacker_FP02", "guess": "unsure", "model_score": 0.8032, "style_score": 0.4436, "combined_score": 0.6234, "status": "decided"}
+{"timestamp": "2026-10-28T23:11:44+00:00", "content_id": "b1f8c7f5401448be809e45c26c5da1f4", "creator_id": "attacker_FP03", "guess": "unsure", "model_score": 0.8361, "style_score": 0.3065, "combined_score": 0.5713, "status": "decided"}
+{"timestamp": "2026-10-28T23:11:28+00:00", "creator_id": "flood_tester", "status": "rejected", "event": "rejected", "reason": "rate_limited"}
+{"timestamp": "2026-10-28T23:11:44+00:00", "creator_id": "attacker_MF04", "status": "rejected", "event": "rejected", "reason": "invalid_text"}
+{"timestamp": "2026-10-28T23:11:44+00:00", "creator_id": "attacker_MF05", "status": "rejected", "event": "rejected", "reason": "text_too_long"}
+{"timestamp": "2026-10-28T23:11:44+00:00", "creator_id": "unknown", "status": "rejected", "event": "rejected", "reason": "invalid_json"}
 ```
 
 **The single worst outcome** — the one I'd least want to explain to a writer
 whose work got caught by it:
+
+FP01: plain, simple human-style writing ("I go to work every day. I take
+the bus. The bus is slow...") labelled high-confidence AI at 0.709. The
+model signal scored it 0.9102 — short common words are maximally
+predictable — and the style signal (0.5085) did not pull it back. The
+writer this accuses is exactly the plain writer with the least room to
+argue back.
 
 
 
@@ -342,38 +397,94 @@ whose work got caught by it:
 
 ## Run Log and Verdicts
 
-<!-- Your five criteria across three trials. `run_eval.py --label before`. -->
+Full record: `results/run_2026-10-28_2313_before.md`. Criterion 4 was
+tested by hand, because `run_eval.py` only sends submissions and an appeal
+needs a content_id first: submit → appeal → read the log. The hand-check
+passed before and after the improvement (appeal returns 200 with status
+`under_review`, the original decision stays in the log untouched, and an
+unknown content_id returns 404).
+
+One finding about the trials themselves: all three trials produced
+byte-identical scores. Perplexity is deterministic for a fixed text and
+model, so identical input scores identically every time. Three identical
+trials here is a finding about the signal, not a broken test — and it
+means "the target must hold across all three trials" is decided by one
+number repeated three times, not three independent draws.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. False positives on human-style writing | At most 1 of 10 human-style test paragraphs labelled high-confidence AI | 0 | 0 | 0 | MET |
+| 2. Score spread | AI-style mean at least 0.30 above human-style mean | 0.20 | 0.20 | 0.20 | MISSED |
+| 3. Label coverage | All three labels appear across the coverage inputs | unsure only | unsure only | unsure only | MISSED |
+| 4. The appeal path | Every real appeal recorded as under_review, original untouched, unknown → 404 | pass | pass | pass | MET |
+| 5. Bad input | All 4 malformed bodies 4xx, never 5xx, logged as rejections | 400 × 4 | 400 × 4 | 400 × 4 | MET |
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
-```json
+`results/run_2026-10-28_2313_before.md`, produced by `run_eval.py::main`
+(score spread, trial 1 — first 5 rows are AI-style test paragraphs, last 5
+are human-style; combined = mean of model_score and style_score):
 
+```json
+{"status": 200, "guess": "unsure", "model_score": 0.8063, "style_score": 0.4252, "combined": 0.6158}
+{"status": 200, "guess": "ai", "model_score": 0.8997, "style_score": 0.4045, "combined": 0.6521}
+{"status": 200, "guess": "unsure", "model_score": 0.936, "style_score": 0.3449, "combined": 0.6404}
+{"status": 200, "guess": "unsure", "model_score": 0.8279, "style_score": 0.4097, "combined": 0.6188}
+{"status": 200, "guess": "ai", "model_score": 0.9229, "style_score": 0.4192, "combined": 0.6711}
+{"status": 200, "guess": "unsure", "model_score": 0.6669, "style_score": 0.2362, "combined": 0.4516}
+{"status": 200, "guess": "unsure", "model_score": 0.7214, "style_score": 0.3, "combined": 0.5107}
+{"status": 200, "guess": "unsure", "model_score": 0.6253, "style_score": 0.3356, "combined": 0.4804}
+{"status": 200, "guess": "unsure", "model_score": 0.577, "style_score": 0.1656, "combined": 0.3713}
+{"status": 200, "guess": "unsure", "model_score": 0.5979, "style_score": 0.1533, "combined": 0.3756}
 ```
+
+AI-style mean 0.6396, human-style mean 0.4379, spread 0.2017 — under the
+0.30 target.
 
 **Diagnoses**
 
-<!-- For each miss AND each broken attack: the stage and the mechanism.
+For each miss and each broken attack: the stage and the mechanism. The
+five stages are the route, signal one, signal two, the combining rule, and
+the label mapping.
 
-     Your service has five stages: the route, signal one, signal two, the
-     combining rule, and the label mapping.
-
-     Not a diagnosis:  "The evasion attacks got through."
-     A diagnosis:      "Four evasion inputs got through. All four had typos
-                        added to AI-generated text. My second signal measures
-                        word variety, and typos raise word variety — so it read
-                        them as more human. My combining rule weights that
-                        signal at 0.6, so it dragged the whole score down."
-
-     Look for a pattern. Five failures on one signal is one problem, not five. -->
+- **EV01 typo evasion (BROKE) — stage: signal one.** The attack was
+  designed to move the style signal, but the damage came through the model
+  signal instead: model_score collapsed 0.8063 → 0.3270 while style_score
+  barely moved (0.4252 → 0.4309). Perplexity measures predictability, and
+  misspellings are maximally unpredictable to gpt2, so typo'd AI text
+  reads as surprising — and therefore human — to signal one. The combining
+  rule passed half the collapse through, dragging combined 0.6157 → 0.3790.
+- **EV02 sentence-splitting (near miss) — stages: signal one + signal
+  two.** Chopping sentences raised the spread (style 0.4252 → 0.3752) and
+  also made the text less predictable (model 0.8063 → 0.4883). Combined
+  fell 0.6157 → 0.4317, just short of the 0.20 line in my judgment rule.
+  Same lesson as EV01: shape changes move both signals, not just the style
+  one.
+- **FP01 false positive (BROKE) — stage: signal one, via the combining
+  rule.** Short common words are maximally predictable, so the model signal
+  scored plain simple prose 0.9102; the style signal (0.5085) did not pull
+  it back, and the 0.5 weight let combined cross the AI threshold at
+  0.7093. The writers this signal is most likely to accuse are the ones
+  with the least room to argue back — that is structural, not a bug.
+- **Criterion 2 spread (MISSED) — stages: both signals + combining rule.**
+  The model gap between the two test groups is only 0.24 (AI-style mean
+  0.8786 vs human-style mean 0.6377) and the style gap 0.16. A weighted
+  average can never exceed its largest input gap, so NO combining rule
+  reaches 0.30 on these inputs — not even model-only. The 0.30 target
+  exceeds what the signals separate. It stays MISSED and diagnosed; it is
+  not revised, because a missed target is not a broken measurement.
+- **Criterion 3 coverage (MISSED) — stages: label mapping + signals.**
+  Before the improvement, human-style scores (0.37–0.51) and AI-style
+  scores (0.62–0.67) both sat inside the 0.35–0.65 unsure band, so all three
+  coverage inputs landed unsure. The "borderline" input is a second,
+  separate problem: plain meeting prose scores 0.6119 because it reads
+  AI-like to both signals (model 0.7738) — it is not actually borderline
+  for this system.
+- **Malformed + flood (HELD) — stage: the route.** Every malformed body
+  returned 400 and was logged as a rejection; the flood run proved the
+  limiter with 10×200 then 5×429. No diagnosis needed — the route stage
+  works.
 
 
 
@@ -383,18 +494,60 @@ that produced it:
 
 **What I changed:**
 
+One thing: the label thresholds in `config.py` — `HUMAN_THRESHOLD`
+0.35 → 0.50, `AI_THRESHOLD` 0.65 → 0.60. No weights, no signals, no routes
+changed. The label texts did not change; the Label Variants table above
+was updated to the new ranges.
+
 **Which diagnosis pointed at it:**
+
+The label-mapping diagnosis behind criterion 3: the original 0.35/0.65
+band left nearly every real input unsure, because human-style test scores
+(0.37–0.51) and AI-style scores (0.62–0.67) both sat inside it. The new
+band sits in the observed gap between the two clusters, so clear cases get
+decided and only genuinely intermediate scores stay unsure.
 
 ### Attack Run — After
 
-<!-- Same format. `run_attacks.py --label after` -->
+Full record: `results/attack_run_2026-10-28_2315_after.md`. Same 15 attacks,
+same judgment rule.
 
+| ID | Family | After (guess, combined) | Verdict |
+|---|---|---|---|
+| EV01 | evasion (typos) | human, 0.379 | BROKE (was unsure) |
+| EV02 | evasion (split sentences) | human, 0.432 | BROKE (was unsure) |
+| EV03 | evasion (quote paste) | unsure, 0.549 | HELD |
+| EV04 | evasion (punctuation) | unsure, 0.554 | HELD |
+| EV05 | evasion (light edit) | unsure, 0.599 | HELD |
+| FP01 | false_positive (plain simple prose) | ai, 0.709 | BROKE (unchanged) |
+| FP02 | false_positive (second-language plain prose) | ai, 0.623 | BROKE (was unsure) |
+| FP03 | false_positive (short plain note) | unsure, 0.571 | HELD |
+| MF01–MF05 | malformed | 400 × 5 | HELD |
+| FL01–FL02 | flood_same_creator | ai, 0.616 | HELD (correct label; 200s expected) |
 
+Eval run after: `results/run_2026-10-28_2316_after.md`.
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. False positives | At most 1 of 10 labelled AI | 0 | 0 | 0 | MET |
+| 2. Score spread | AI mean ≥ human mean + 0.30 | 0.20 | 0.20 | 0.20 | MISSED |
+| 3. Label coverage | All three labels appear | ai, human, ai | ai, human, ai | ai, human, ai | MISSED |
+| 4. The appeal path | Real appeals recorded, unknown → 404 | pass | pass | pass | MET |
+| 5. Bad input | All 4 bodies 4xx, logged | 400 × 4 | 400 × 4 | 400 × 4 | MET |
 
 **Did it help, and how do I know:**
 
-<!-- Widening the unsure band usually fixes one problem and creates another.
-     Reporting that trade honestly is worth full credit. -->
+Partly, and the honest answer has two halves. What improved: labels are
+now decisive instead of "unsure about everything" — AI-style test
+paragraphs are labelled AI 5/5 (were 2/5), human-style ones are labelled
+human 8/10 with 2 unsure and 0 AI, and criterion 3 moved from "unsure
+only" to two of three labels. What got worse: narrowing the unsure band
+helped every side, not just the honest one. Both typo and split-sentence
+evasions now fully succeed (human labels), and FP02 — second-language
+plain prose — is newly accused as AI. Criteria 2 and 3 are still MISSED:
+thresholds move labels, not scores, so the 0.20 spread cannot change, and
+the "borderline" coverage input still reads AI (0.6119). The improvement
+bought decisiveness and paid for it in false positives and evasions.
 
 
 
@@ -402,15 +555,42 @@ that produced it:
 
 ## What's Still Broken
 
-<!-- For each attack still getting through and each criterion still missed:
-     what you'd do, and why you stopped. -->
-
-
+- **EV01/EV02 evasions succeed.** Typos and sentence-splitting push AI-style
+  text into the human band (0.379, 0.432). What I'd do: add a signal that
+  typos cannot move — for example, a spell-check-aware pass that scores the
+  text before and after normalization, or a measure of argument structure
+  rather than surface shape. Why I stopped: that is a third signal, which is
+  a new build, not a fix — and the unit asks for one improvement, honestly
+  measured, not a rebuild.
+- **FP01/FP02 false positives.** Plain simple prose and second-language
+  plain prose are labelled AI (0.709, 0.623). What I'd do: calibrate the
+  model signal's midpoint against plain human writing specifically, or add
+  a human-review gate before any high-confidence AI label is shown to a
+  reader. Why I stopped: moving the model midpoint means editing
+  `detector.py`, which is out of bounds for this build, and a review gate
+  is a product decision, not a code fix.
+- **Criterion 2 (spread 0.20 vs 0.30 target).** No combining rule can fix
+  this — the largest input gap is the model signal's 0.24. What I'd do:
+  find a genuinely more separating signal, or accept a lower target next
+  time the criteria are written (not by revising this one — a missed target
+  stays missed).
+- **Criterion 3 (coverage).** The "borderline" input is not borderline for
+  this system: plain meeting prose reads AI-like (model 0.774). What I'd
+  do: pick coverage inputs from the system's actual score distribution
+  instead of from intuition about what "borderline" means.
+- **Short submissions.** With fewer than two sentences the style spread is
+  0.0, which pushes the style signal toward AI. Short human notes are the
+  most likely to be misread for this reason on top of the model signal's
+  plain-prose problem.
 
 **The trade I'd make if this ran for real:**
 
-<!-- Two sentences. Fewer wrong accusations means more AI text getting through.
-     Say which way you'd go and WHO PAYS FOR IT. -->
+I would go back toward the wider unsure band and require a human review
+before any high-confidence AI label is shown to anyone. Fewer wrong
+accusations means more AI text getting through — and that is the right way
+round, because the cost of a wrong accusation falls on one writer who
+cannot easily argue back, while the cost of a missed detection falls on
+the platform, a little, spread across everyone.
 
 
 
