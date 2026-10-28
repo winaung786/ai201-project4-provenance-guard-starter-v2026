@@ -21,7 +21,20 @@ import config
 
 def combine_signals(model_score: float, style_score: float) -> float:
     """
-    Combine two 0–1 signals into one 0–1 score. ← TODO (Milestone 4)
+    Combine two 0–1 signals into one 0–1 score. (Milestone 4)
+
+    The rule is a weighted average using the weights in config.py
+    (WEIGHT_MODEL_SIGNAL = 0.5, WEIGHT_STYLE_SIGNAL = 0.5), clamped to
+    0–1. The weights stay equal because the calibration runs gave no
+    evidence that one signal is systematically more trustworthy than the
+    other — and when the two signals disagree, the average lands in the
+    unsure band, which is the honest outcome: two methods disagreeing IS
+    uncertainty, not a reason to let the louder one win.
+
+    The trade this rule makes, stated plainly: weighting toward neither
+    signal means a text that is AI on one signal and human on the other is
+    called unsure rather than accused or cleared. That costs missed
+    detections and buys fewer false accusations.
 
     Both inputs point the same way: higher means more likely AI. Your output
     should too.
@@ -85,12 +98,21 @@ def score_to_label(score: float) -> tuple[str, str]:
     think if they got it on their own work. That question is the whole
     milestone.
     """
-    # TODO: replace this — thresholds are in config.py
+    # Thresholds come from config.py: HUMAN_THRESHOLD = 0.35,
+    # AI_THRESHOLD = 0.65. All three bands are reachable: any score at or
+    # below 0.35 is human, any score at or above 0.65 is AI, and everything
+    # between is unsure.
     if score >= config.AI_THRESHOLD:
-        return "ai", "PLACEHOLDER — write the high-confidence AI label."
+        return "ai", "We think this was probably written by AI."
     if score <= config.HUMAN_THRESHOLD:
-        return "human", "PLACEHOLDER — write the high-confidence human label."
-    return "unsure", "PLACEHOLDER — write the unsure label."
+        return "human", "We think this was probably written by a person."
+    return (
+        "unsure",
+        "We couldn't tell with confidence whether this was written by a "
+        "person or by AI. This is not an accusation — it only means the "
+        "writing doesn't clearly match either pattern, so it needs a human "
+        "look before anyone acts on it.",
+    )
 
 
 def label_ranges() -> list[tuple[str, str]]:
