@@ -42,65 +42,65 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. False positives on human-style writing
 
-<!-- Your criterion. It must name a number. -->
+Of 10 human-style test paragraphs, at most 1 is labelled high-confidence AI
+in each of three trials.
 
+**Why this target:** A wrong accusation costs a real writer far more than a
+missed detection costs a site, so the false-positive budget is tight — but
+not zero, because plain conventional writing can read as machine-like and
+one borderline case in ten is the honest allowance for that.
 
+## 2. Score spread between AI-style and human-style writing
 
-**Why this target:**
+The mean combined score of 5 AI-style test paragraphs is at least 0.30 above
+the mean combined score of 5 human-style test paragraphs, in each of three
+trials.
 
+**Why this target:** If the two kinds of writing do not separate by a clear
+margin, the labels are noise no matter how the thresholds are set. 0.30 is
+wide enough that a single borderline paragraph cannot fake a pass.
 
+## 3. Label coverage
 
----
+All three labels — high-confidence human, unsure, high-confidence AI —
+appear across the label-coverage inputs in each of three trials.
 
-## 2.
+**Why this target:** A label no input can reach is a dead band in the
+scoring: it means the thresholds or the signals are not doing what the
+README claims they do, and a reader can never actually receive that verdict.
 
-<!-- Your criterion. -->
+## 4. The appeal path
 
+Every appeal against a real content_id returns a confirmation and is
+recorded in the audit log with status `under_review`, with the original
+decision left untouched in the log; an appeal against an unknown content_id
+returns 404. All appeal checks pass in each trial.
 
+**Why this target:** The appeal path is the only thing standing between a
+wrong accusation and nothing at all. If it silently drops appeals, or
+overwrites the original decision, there is no recourse and no audit trail.
 
-**Why this target:**
+## 5. Bad input
 
+All four malformed bodies — empty text, missing `text` field, null text, and
+huge text — return a 4xx status (never a 5xx, never a crash) and each is
+recorded in the audit log as a rejection.
 
-
----
-
-## 3.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
-
----
-
-## 4.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
-
----
-
-## 5.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** Malformed input is the most common real failure of a
+web service. A crash on it is worse than a wrong label, because it takes the
+whole service down for everyone else, and an unlogged rejection is an attack
+nobody can find later.
 
 ---
+
+> **STATUS: DRAFTS — proposed by the build coordinator for Mohammad's
+> approval, not Mohammad's own words.** In unit 2 he wrote his own criteria;
+> these are proposals he may edit or replace. The test paragraphs in
+> `scenarios.py` are evaluation test inputs written for this evaluation
+> (AI-style and human-style test paragraphs) — they are NOT Mohammad's own
+> personal writing, and nothing in this repo claims they are.
 
 <!-- ─────────────────────────────────────────────────────────────────────────
      UNIT 8 — read this before you change anything above.
