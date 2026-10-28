@@ -46,6 +46,12 @@ DETECTOR_MODEL = os.getenv("AI201_DETECTOR_MODEL", "gpt2")
 # 300 words, which is enough for the signal to mean something.
 DETECTOR_MAX_TOKENS = 400
 
+# The route rejects text longer than this with a 400 (logged as a rejection)
+# instead of crashing or silently truncating: 20,000 characters is far more
+# than the 400 tokens the detector reads, so nothing real is lost, and an
+# enormous body cannot tie up the model. Documented in README.
+MAX_TEXT_CHARS = 20000
+
 
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
