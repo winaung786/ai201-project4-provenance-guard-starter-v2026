@@ -62,10 +62,9 @@ def combine_signals(model_score: float, style_score: float) -> float:
       - Milestone 4 asks you to find a case where your two signals split and
         write it down. That case is what this rule exists to handle.
 
-    The weights in config.py are placeholders. Change them, or ignore them and
-    write a different rule.
+    The weights in config.py are the decided 0.5/0.5 — see the note in
+    `combine_signals` above for why they stay equal.
     """
-    # TODO: replace this
     return (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
@@ -75,7 +74,7 @@ def combine_signals(model_score: float, style_score: float) -> float:
 def score_to_label(score: float) -> tuple[str, str]:
     """
     Turn a score into a guess and the text a reader actually sees.
-    ← TODO (Milestone 5)
+    (Milestone 5 — implemented; thresholds from config.py.)
 
     Returns:
         (guess, label_text) — where `guess` is a short machine-readable string
