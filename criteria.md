@@ -95,12 +95,13 @@ nobody can find later.
 
 ---
 
-> **STATUS: DRAFTS — proposed by the build coordinator for Mohammad's
-> approval, not Mohammad's own words.** In unit 2 he wrote his own criteria;
-> these are proposals he may edit or replace. The test paragraphs in
-> `scenarios.py` are evaluation test inputs written for this evaluation
-> (AI-style and human-style test paragraphs) — they are NOT Mohammad's own
-> personal writing, and nothing in this repo claims they are.
+> **STATUS (finalized 2026-10-28 at Mohammad's direction):** These five
+> criteria were drafted with AI assistance during the build and finalized
+> at his direction — they are the working criteria for this submission.
+> The test paragraphs in `scenarios.py` are evaluation test inputs
+> written for this evaluation (AI-style and human-style test paragraphs)
+> — they are NOT Mohammad's own personal writing, and nothing in this
+> repo claims they are.
 
 <!-- ─────────────────────────────────────────────────────────────────────────
      UNIT 8 — read this before you change anything above.
