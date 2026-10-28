@@ -92,13 +92,13 @@ AI_THRESHOLD = 0.65
 
 
 # ─── Rate limiting (UNIT 8) ──────────────────────────────────────────────────
-# Off in unit 7. You turn it on and choose the numbers in unit 8, Milestone 1.
-#
-# Think about two people: a real writer submitting their own work a few times
-# an hour, and a script sending a thousand variations to map your thresholds.
-# Your README has to say why your numbers and not others.
-
-RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+# Off in unit 7. Turned on in unit 8, Milestone 1: the default is now "1"
+# (on), still overridable with AI201_RATE_LIMITS=0. The numbers are the
+# starter defaults — 10/minute, 200/day — kept because they are liveable for
+# a real writer (a few submissions an hour) and hostile to a script mapping
+# thresholds (a thousand variations would take 100 minutes per minute-bucket
+# and trip the day cap long before finishing). Justification in README.
+RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "1") == "1"
 
 RATE_LIMIT_PER_MINUTE = 10
 RATE_LIMIT_PER_DAY = 200
