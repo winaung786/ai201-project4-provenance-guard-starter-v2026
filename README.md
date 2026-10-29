@@ -162,9 +162,9 @@ be reported as a verdict about a person.
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human | 0.00 – 0.50 | We think this was probably written by a person. |
-| unsure | 0.50 – 0.60 | We couldn't tell with confidence whether this was written by a person or by AI. This is not an accusation — it only means the writing doesn't clearly match either pattern, so it needs a human look before anyone acts on it. |
-| high-confidence AI | 0.60 – 1.00 | We think this was probably written by AI. |
+| high-confidence human | 0.00 ≤ score ≤ 0.50 | We think this was probably written by a person. |
+| unsure | 0.50 < score < 0.60 | We couldn't tell with confidence whether this was written by a person or by AI. This is not an accusation — it only means the writing doesn't clearly match either pattern, so it needs a human look before anyone acts on it. |
+| high-confidence AI | 0.60 ≤ score ≤ 1.00 | We think this was probably written by AI. |
 
 > Ranges updated in unit 8: the original 0.35/0.65 band was recalibrated
 > to 0.50/0.60 as the one improvement (see "The Improvement" below). The
@@ -175,10 +175,11 @@ It has to admit uncertainty without sounding like an accusation, because
 the person reading it may well have written every word themselves. So it
 says what the system *couldn't* do ("couldn't tell with confidence"),
 explicitly denies that it is an accusation, and names the next step (a
-human look) instead of leaving the writer to guess what happens now. All
-three labels are reachable: scores at or below 0.35 are human, at or above
-0.65 are AI, and everything between is unsure — verified by submitting
-texts that land in each band.
+human look) instead of leaving the writer to guess what happens next. The
+current code uses: scores at or below **0.50** → human; scores at or above
+**0.60** → AI; scores strictly between → unsure. All three mapping branches
+are defined, but the *after* evaluation inputs only produced two labels;
+acceptance criterion 3 was therefore correctly marked **MISSED** below.
 
 
 
@@ -189,7 +190,18 @@ texts that land in each band.
 <!-- One submission and one appeal, pasted as text: the request, the response,
      and the log entries. -->
 
-**A submission**
+**Historical Unit 7 sample — before the Unit 8 threshold change.** This
+request, response and appeal were captured when human scores were ≤ 0.35 and
+AI scores were ≥ 0.65. A combined score of **0.61575** was therefore
+**unsure** at that time. The current code uses human ≤ 0.50 and AI ≥ 0.60,
+so **the same score would now be `ai`**, with the label
+"We think this was probably written by AI." The historical response and
+log excerpts are preserved verbatim, not rewritten as if they came from the
+current code. The committed audit log primarily contains later runs; the
+earlier content ID shown below is not in the current committed
+`logs/audit.jsonl`.
+
+**A submission (original thresholds)**
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
@@ -209,7 +221,7 @@ $ curl -X POST http://127.0.0.1:5000/submit \
 }
 ```
 
-**An appeal**
+**An appeal (original thresholds)**
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/appeal \
@@ -225,7 +237,7 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 }
 ```
 
-**What the log shows afterwards**
+**Historical audit-log excerpt captured immediately after that appeal**
 
 ```bash
 $ curl "http://127.0.0.1:5000/log?limit=3"
@@ -253,7 +265,35 @@ $ curl "http://127.0.0.1:5000/log?limit=3"
 }
 ```
 
-Bad input, verified in the same session: empty text → 400 `empty_text`;
+**Current-threshold audit evidence (committed later).** The current
+`logs/audit.jsonl` contains this separate decision-and-appeal pair under
+the **0.50/0.60** thresholds. The combined score is 0.54045, so the
+`unsure` label here **does** match the current code. These are real retained
+log entries, not a fabricated rerun of the older curl request.
+
+```json
+{
+  "timestamp": "2026-10-28T23:16:26+00:00",
+  "content_id": "20271d26c3f3437db288a01dc1ee0c82",
+  "creator_id": "appeal_after",
+  "guess": "unsure",
+  "model_score": 0.653,
+  "style_score": 0.4279,
+  "combined_score": 0.54045,
+  "label": "We couldn't tell with confidence whether this was written by a person or by AI. This is not an accusation — it only means the writing doesn't clearly match either pattern, so it needs a human look before anyone acts on it.",
+  "status": "decided"
+}
+{
+  "timestamp": "2026-10-28T23:16:26+00:00",
+  "content_id": "20271d26c3f3437db288a01dc1ee0c82",
+  "creator_id": "appeal_after",
+  "event": "appeal",
+  "status": "under_review",
+  "reasoning": "After-threshold hand-check."
+}
+```
+
+Bad input, verified in the original session: empty text → 400 `empty_text`;
 missing or null `text` → 400 `invalid_text`; 250,000-character text → 400
 `text_too_long`; missing `creator_id` → 400 `missing_creator_id`. Every one
 was recorded in the audit log as a rejection, and none crashed the route.
