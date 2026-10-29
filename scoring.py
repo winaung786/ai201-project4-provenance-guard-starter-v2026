@@ -97,10 +97,10 @@ def score_to_label(score: float) -> tuple[str, str]:
     think if they got it on their own work. That question is the whole
     milestone.
     """
-    # Thresholds come from config.py: HUMAN_THRESHOLD = 0.35,
-    # AI_THRESHOLD = 0.65. All three bands are reachable: any score at or
-    # below 0.35 is human, any score at or above 0.65 is AI, and everything
-    # between is unsure.
+    # Thresholds come from config.py (currently HUMAN_THRESHOLD = 0.50,
+    # AI_THRESHOLD = 0.60). Scores at/below 0.50 are human, scores
+    # at/above 0.60 are AI, and scores strictly between are unsure.
+    # Keep the values in config.py as the single source of truth.
     if score >= config.AI_THRESHOLD:
         return "ai", "We think this was probably written by AI."
     if score <= config.HUMAN_THRESHOLD:
