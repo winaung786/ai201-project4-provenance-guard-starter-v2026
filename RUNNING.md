@@ -172,9 +172,10 @@ That sends 15 submissions from one `creator_id` and prints the run of status
 codes — `200 200 200 ... 429 429` — which is exactly what your README's **Rate
 Limiting** section asks you to paste. It also writes `results/flood_<date>.md`.
 
-The attack set can't do this for you. Every attack row submits under its own
-`creator_id`, so a full attack run looks like forty-odd different callers and
-never trips a limit however long it is.
+The attack CSV's ordinary rows submit under separate `creator_id` values, so
+they do not test a per-creator burst limit. Rows in the
+`flood_same_creator` family share an ID, but two local rows are too few to
+reach a 10-per-minute cap. Use `--flood 15` for that check.
 
 No `429` at all? Either your limit is above 15 a minute, or rate limiting is
 still off. `GET /health` reports which.

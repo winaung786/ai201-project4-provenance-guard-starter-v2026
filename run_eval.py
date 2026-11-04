@@ -6,8 +6,8 @@ Run your five criteria three times each.  <- UNIT 8, MILESTONE 3
     python run_eval.py --label before          # in another
     python run_eval.py --label after
 
-The attack set tests what staff thought to test. This tests what *you* thought
-to test, and the two rarely overlap much. Both count.
+The staff attack set, when available, tests what staff thought to test.
+This evaluates the project-specific criteria; both records matter.
 
 Fill in `scenarios.py` first — that's where you say what each criterion needs
 run against it. A criterion about false positives needs your own writing. One

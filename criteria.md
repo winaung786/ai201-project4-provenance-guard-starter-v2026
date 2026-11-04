@@ -1,9 +1,10 @@
 # Acceptance criteria — Provenance Guard
 
-Five criteria that say what "working" means for this service, written in unit 7
-**before** you built it.
+Five criteria that say what "working" means for this service. They were
+drafted during unit 7 and finalized after the build, as the authorship note
+below records.
 
-**All five are yours.** None are given.
+**All five are project-specific.** None are given by the starter.
 
 An acceptance criterion names a number or something plainly observable. *"The
 detector is accurate"* is an opinion — and perfect AI detection isn't possible

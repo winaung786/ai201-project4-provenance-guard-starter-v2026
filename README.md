@@ -338,24 +338,44 @@ they are not the author's own writing.
 
 ---
 
+## Unit 8 evidence status
+
+The committed `attacks/` CSVs are a **locally constructed 15-case set**, not
+the staff-provided attack ZIP. The retained before/after reports and audit
+entries below document runs of that local set only. The staff attack run is
+**pending**: the ZIP was not available in this repository or the connected
+Drive checked on 2026-11-04. The class Unit 8 slides describe a 56-case
+staff set with five families, including `prompt_injection`; this local set
+has 15 cases in four families and contains no prompt-injection cases.
+Do not submit the local run as evidence that the staff set was run. When the
+staff ZIP is available, extract it into its own folder, run the full set with
+`python run_attacks.py --set <staff-folder> --label staff_before`, and record
+its provenance, every outcome, diagnoses, and relevant audit entries. A new
+after-run is needed if a later change is made in response to that set.
+
+The criteria table below reports the recorded local evaluation. Criterion 4
+was checked manually once before and once after the threshold change, not in
+three trials at either point. Its three-trial target remains unverified.
+
+---
+
 ## Rate Limiting
 
 **My limits:** 10 per minute, 200 per day
 
 **Why those numbers and not others:**
-A real writer submits their own work a few times an hour — 10 a minute
-never touches them. A script sending a thousand variations to map the
-thresholds would need 100 minutes just to get through the minute buckets
-and would hit the 200-a-day cap long before finishing the map. The numbers
-are the starter defaults, kept deliberately: raising the minute limit
-would let a threshold-mapping script finish in one sitting, and lowering
-it would start blocking real writers who resubmit after an edit or two.
+A real writer submits their own work a few times an hour, so 10 a minute
+should leave room for ordinary edits. For one fixed limiter key, a script
+sending a thousand variations would need at least 100 minute buckets and
+would hit the 200-a-day cap first. The numbers are the starter defaults,
+kept deliberately. This does not stop a script that rotates `creator_id`;
+the per-key limit is only a local demonstration, not a global abuse control.
 
 **What a caller counts as:** Per `creator_id` when the request supplies a
 non-empty one, else per IP address (`app.py::rate_limit_key`). They fail
 differently: one script can look like a thousand callers if it rotates
-creator_id (which is why the full attack set, with one creator per attack,
-never trips the limit), and one household or classroom behind one address
+creator_id (which is why the local set's separate-creator cases do not trip
+the limit), and one household or classroom behind one address
 can look like one caller if creator_id is missing.
 
 **The run of status codes when I pushed past it:**
@@ -374,13 +394,19 @@ shows up only as an absence is one nobody can find later. Full record:
 
 ## Attack Run — Before
 
-Full record: `results/attack_run_2026-10-28_2311_before.md` (15 attacks, 0
-auto-BROKE, 15 judged by hand). The attack set is locally constructed in
-`attacks/` — the course's official CSVs were not present in this workspace
-— covering the families the harness names: evasion, false_positive,
+Full record: `results/attack_run_2026-10-28_2311_before.md` (15 local attacks,
+0 auto-BROKE, 15 judged by hand). The attack set is locally constructed in
+`attacks/`, covering evasion, false_positive,
 malformed, flood_same_creator. One harness limit found while building it:
 the CSV reader's 128KB field limit caps the malformed huge body at 50,000
 characters (still over the route's 20,000 limit, so the rejection is real).
+The harness now accepts larger CSV fields for a future staff run.
+
+The archived reports' `Score` column is **confidence**, the distance from
+0.5, rather than the combined score used for the judgments below. The
+per-attack JSON blocks and audit entries retain the actual combined scores.
+Those historical reports are left intact; new reports use an explicitly
+named `Combined score` column.
 
 Judgment rule for evasion, stated before the marks: an evasion counts as
 BROKE if it lands in the human band, or if it drags the combined score at
@@ -403,8 +429,8 @@ label is a near miss, and it is named as one.
 
 FL01/FL02 are not a break: two requests from one creator cannot trip a
 10-per-minute limit, and the limit itself was proven by the flood run
-above. The full attack set deliberately uses one creator per attack, so it
-cannot test the limiter — that is what `--flood` is for.
+above. Most local cases use separate creators, and the two flood-family
+cases cannot test the limit by themselves — that is what `--flood` is for.
 
 **Ten audit log entries from the run**
 
@@ -421,10 +447,10 @@ cannot test the limiter — that is what `--flood` is for.
 {"timestamp": "2026-10-28T23:11:44+00:00", "creator_id": "unknown", "status": "rejected", "event": "rejected", "reason": "invalid_json"}
 ```
 
-**The single worst outcome** — the one I'd least want to explain to a writer
+**The single worst local-test outcome** — the one I'd least want to explain to a writer
 whose work got caught by it:
 
-FP01: plain, simple human-style writing ("I go to work every day. I take
+FP01: simulated plain, simple human-style writing ("I go to work every day. I take
 the bus. The bus is slow...") labelled high-confidence AI at 0.709. The
 model signal scored it 0.9102 — short common words are maximally
 predictable — and the style signal (0.5085) did not pull it back. The
@@ -440,9 +466,10 @@ argue back.
 Full record: `results/run_2026-10-28_2313_before.md`. Criterion 4 was
 tested by hand, because `run_eval.py` only sends submissions and an appeal
 needs a content_id first: submit → appeal → read the log. The hand-check
-passed before and after the improvement (appeal returns 200 with status
+passed once before and once after the improvement (appeal returns 200 with status
 `under_review`, the original decision stays in the log untouched, and an
-unknown content_id returns 404).
+unknown content_id returns 404). It does not establish the criterion's
+three-trial target.
 
 One finding about the trials themselves: all three trials produced
 byte-identical scores. Perplexity is deterministic for a fixed text and
@@ -456,7 +483,7 @@ number repeated three times, not three independent draws.
 | 1. False positives on human-style writing | At most 1 of 10 human-style test paragraphs labelled high-confidence AI | 0 | 0 | 0 | MET |
 | 2. Score spread | AI-style mean at least 0.30 above human-style mean | 0.20 | 0.20 | 0.20 | MISSED |
 | 3. Label coverage | All three labels appear across the coverage inputs | unsure only | unsure only | unsure only | MISSED |
-| 4. The appeal path | Every real appeal recorded as under_review, original untouched, unknown → 404 | pass | pass | pass | MET |
+| 4. The appeal path | Every real appeal recorded as under_review, original untouched, unknown → 404 | manual pass | not run | not run | UNVERIFIED across three trials |
 | 5. Bad input | All 4 malformed bodies 4xx, never 5xx, logged as rejections | 400 × 4 | 400 × 4 | 400 × 4 | MET |
 
 **Real output from one trial**, pasted as text, naming the file and function
@@ -572,7 +599,7 @@ Eval run after: `results/run_2026-10-28_2316_after.md`.
 | 1. False positives | At most 1 of 10 labelled AI | 0 | 0 | 0 | MET |
 | 2. Score spread | AI mean ≥ human mean + 0.30 | 0.20 | 0.20 | 0.20 | MISSED |
 | 3. Label coverage | All three labels appear | ai, human, ai | ai, human, ai | ai, human, ai | MISSED |
-| 4. The appeal path | Real appeals recorded, unknown → 404 | pass | pass | pass | MET |
+| 4. The appeal path | Real appeals recorded, unknown → 404 | manual pass | not run | not run | UNVERIFIED across three trials |
 | 5. Bad input | All 4 bodies 4xx, logged | 400 × 4 | 400 × 4 | 400 × 4 | MET |
 
 **Did it help, and how do I know:**
@@ -584,8 +611,9 @@ human 8/10 with 2 unsure and 0 AI, and criterion 3 moved from "unsure
 only" to two of three labels. What got worse: narrowing the unsure band
 helped every side, not just the honest one. Both typo and split-sentence
 evasions now fully succeed (human labels), and FP02 — second-language
-plain prose — is newly accused as AI. Criteria 2 and 3 are still MISSED:
-thresholds move labels, not scores, so the 0.20 spread cannot change, and
+plain prose — is newly accused as AI. Criteria 2 and 3 are still MISSED;
+criterion 4 still lacks three recorded trials. Thresholds move labels, not
+scores, so the 0.20 spread cannot change, and
 the "borderline" coverage input still reads AI (0.6119). The improvement
 bought decisiveness and paid for it in false positives and evasions.
 
@@ -655,7 +683,7 @@ the platform, a little, spread across everyone.
        [ ] Rate limiting on /submit, with your numbers justified
        [ ] The pasted run of status codes showing 429
        [ ] Audit log with all nine fields, recording rejections too
-       [ ] The attack set run IN FULL, every input with an outcome
+       [ ] The STAFF attack ZIP run IN FULL, every input with an outcome
        [ ] Ten audit log entries pasted as text
        [ ] Five criteria across three trials
        [ ] A diagnosis for every miss and every broken attack — stage AND mechanism
