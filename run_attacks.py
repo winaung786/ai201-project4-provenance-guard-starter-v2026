@@ -75,9 +75,8 @@ def load_attacks(folder: Path):
     """
     Read both attack files. Returns (attacks, problems).
 
-    A row that won't parse is skipped and reported rather than raising. One
-    stray comma in a file you didn't write should cost you that attack, not
-    every other attack in the set.
+    Parse problems are returned to the caller. The command refuses to run a
+    partial set, so a missing row cannot silently count as a full run.
 
     `attacks_malformed_requests.csv` may carry two optional columns:
 
@@ -88,45 +87,57 @@ def load_attacks(folder: Path):
         content_type  what to claim it is. Defaults to application/json.
     """
     attacks, problems = [], []
+    # The original 128 KiB CSV field default can reject oversized attack
+    # bodies before the service ever sees them. Ten MiB accommodates large
+    # request cases without requiring an unbounded parser allocation.
+    csv.field_size_limit(10 * 1024 * 1024)
 
     text_file = folder / "attacks.csv"
     if text_file.exists():
-        with text_file.open(encoding="utf-8") as f:
-            for n, row in enumerate(csv.DictReader(f), 2):
-                try:
-                    attacks.append({
-                        "id": row["id"],
-                        "family": row["family"],
-                        "targets": row["targets"],
-                        "body": {"text": row["text"],
-                                 "creator_id": f"attacker_{row['id']}"},
-                    })
-                except (KeyError, TypeError) as exc:
-                    problems.append(f"attacks.csv line {n}: {exc}")
+        try:
+            with text_file.open(encoding="utf-8", newline="") as f:
+                for n, row in enumerate(csv.DictReader(f), 2):
+                    try:
+                        attacks.append({
+                            "id": row["id"],
+                            "family": row["family"],
+                            "targets": row["targets"],
+                            "body": {"text": row["text"],
+                                     "creator_id": f"attacker_{row['id']}"},
+                        })
+                    except (KeyError, TypeError) as exc:
+                        problems.append(f"attacks.csv line {n}: {exc}")
+        except (csv.Error, UnicodeError) as exc:
+            problems.append(f"attacks.csv could not be read completely: {exc}")
 
     request_file = folder / "attacks_malformed_requests.csv"
     if request_file.exists():
-        with request_file.open(encoding="utf-8") as f:
-            for n, row in enumerate(csv.DictReader(f), 2):
-                try:
-                    attack = {
-                        "id": row["id"],
-                        "family": row["family"],
-                        "targets": row["targets"],
-                    }
-                    if (row.get("send_as") or "json").strip().lower() == "raw":
-                        attack["raw"] = row["raw_body"]
-                        attack["content_type"] = (
-                            row.get("content_type") or "application/json"
+        try:
+            with request_file.open(encoding="utf-8", newline="") as f:
+                for n, row in enumerate(csv.DictReader(f), 2):
+                    try:
+                        attack = {
+                            "id": row["id"],
+                            "family": row["family"],
+                            "targets": row["targets"],
+                        }
+                        if (row.get("send_as") or "json").strip().lower() == "raw":
+                            attack["raw"] = row["raw_body"]
+                            attack["content_type"] = (
+                                row.get("content_type") or "application/json"
+                            )
+                        else:
+                            attack["body"] = json.loads(row["raw_body"])
+                        attacks.append(attack)
+                    except (KeyError, TypeError, json.JSONDecodeError) as exc:
+                        problems.append(
+                            f"attacks_malformed_requests.csv line {n}: {exc}. "
+                            f"If the body is meant to be unparseable, set send_as=raw."
                         )
-                    else:
-                        attack["body"] = json.loads(row["raw_body"])
-                    attacks.append(attack)
-                except (KeyError, TypeError, json.JSONDecodeError) as exc:
-                    problems.append(
-                        f"attacks_malformed_requests.csv line {n}: {exc}. "
-                        f"If the body is meant to be unparseable, set send_as=raw."
-                    )
+        except (csv.Error, UnicodeError) as exc:
+            problems.append(
+                f"attacks_malformed_requests.csv could not be read completely: {exc}"
+            )
 
     return attacks, problems
 
@@ -298,9 +309,9 @@ def show_attacks(attacks, url):
         if "raw" in attack:
             print(f"Sent raw, claiming {attack['content_type']}:\n")
             print(attack["raw"] if attack["raw"] else "(an empty body)")
-        elif "text" in attack.get("body", {}):
+        elif isinstance(attack.get("body"), dict) and "text" in attack["body"]:
             print(attack["body"]["text"])
-            print(f"\n(submits as creator_id `{attack['body']['creator_id']}`)")
+            print(f"\n(submits as creator_id `{attack['body'].get('creator_id', 'missing')}`)")
         else:
             print("No text field — the body itself is the attack:\n")
             print(json.dumps(attack["body"], indent=2))
@@ -433,12 +444,12 @@ def main():
     folder = Path(args.folder)
     attacks, problems = load_attacks(folder)
     if problems:
-        print(f"{len(problems)} row(s) in the attack set wouldn't parse and were "
-              f"SKIPPED:", file=sys.stderr)
+        print(f"The attack set has {len(problems)} parse problem(s):", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
-        print("Say so in your write-up — a skipped row is a gap in your run.\n",
-              file=sys.stderr)
+        print("No requests sent. Repair the CSV or document why the full set "
+              "could not be run.\n", file=sys.stderr)
+        sys.exit(1)
     if not attacks:
         print(f"No attack files found in {folder}.\n"
               f"Expected attacks.csv — check the path.", file=sys.stderr)
@@ -556,8 +567,9 @@ def write_report(rows, args):
     lines += [
         "",
         "> The **false_positive** family is the one to look at hardest. Those are",
-        "> written to be genuine human writing that reads as machine-like. Every one",
-        "> your service calls AI is a real writer it would have accused.",
+        "> designed to resemble human writing that reads as machine-like. Check",
+        "> the source before calling a case genuine human writing; an AI-written",
+        "> local test is evidence of model behavior, not a measured accusation.",
         "",
         "---",
         "",
