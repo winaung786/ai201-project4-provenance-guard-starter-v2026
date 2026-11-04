@@ -498,6 +498,7 @@ def main():
             "creator_id": (attack.get("body") if isinstance(attack.get("body"), dict) else {}).get("creator_id"),
             "guess": payload.get("guess"),
             "confidence": payload.get("confidence"),
+            "combined_score": payload.get("combined_score"),
             "model_score": payload.get("model_score"),
             "style_score": payload.get("style_score"),
             "label": payload.get("label"),
@@ -536,22 +537,24 @@ def write_report(rows, args):
         "an evasion worked depends on where you put your thresholds — read the",
         "`targets` column, look at what came back, and write HELD or BROKE yourself.",
         "",
-        "Each attack submits as creator_id `attacker_<id>`, and the content_id it",
-        "came back with is in the table — either one will match this run against your",
-        "audit log when you go looking for the ten entries to paste.",
+        "Ordinary rows in attacks.csv submit as creator_id `attacker_<id>`;",
+        "malformed and flood rows can use other IDs or no ID. Match accepted",
+        "requests to the audit log using the content_id in the table.",
         "",
-        "| ID | Family | Targeting | Status | Content ID | Guess | Score | Verdict |",
-        "|---|---|---|---|---|---|---|---|",
+        "| ID | Family | Targeting | Status | Content ID | Guess | Combined score | Confidence | Verdict |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
 
     for row in rows:
-        score = row["confidence"]
-        score_text = f"{score:.3f}" if isinstance(score, (int, float)) else "—"
+        combined = row["combined_score"]
+        confidence = row["confidence"]
+        combined_text = f"{combined:.3f}" if isinstance(combined, (int, float)) else "—"
+        confidence_text = f"{confidence:.3f}" if isinstance(confidence, (int, float)) else "—"
         targets = row["targets"].replace("|", "\\|")
         lines.append(
             f"| {row['id']} | {row['family']} | {targets} | "
             f"{row['status'] or '—'} | `{row['content_id'] or '—'}` | "
-            f"{row['guess'] or '—'} | {score_text} | "
+            f"{row['guess'] or '—'} | {combined_text} | {confidence_text} | "
             f"{row['verdict'] or ''} |"
         )
 

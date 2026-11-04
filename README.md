@@ -404,9 +404,10 @@ The harness now accepts larger CSV fields for a future staff run.
 
 The archived reports' `Score` column is **confidence**, the distance from
 0.5, rather than the combined score used for the judgments below. The
-per-attack JSON blocks and audit entries retain the actual combined scores.
+Audit entries retain the actual combined scores; the reports' per-attack JSON
+blocks retain the two signal scores from which they can be recomputed.
 Those historical reports are left intact; new reports use an explicitly
-named `Combined score` column.
+named `Combined score` column beside `Confidence`.
 
 Judgment rule for evasion, stated before the marks: an evasion counts as
 BROKE if it lands in the human band, or if it drags the combined score at
