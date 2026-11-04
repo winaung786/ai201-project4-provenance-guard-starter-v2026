@@ -80,10 +80,10 @@ WEIGHT_STYLE_SIGNAL = 0.5
 # Recalibrated in unit 8 (the one improvement — see README "The
 # Improvement"). The original 0.35/0.65 band left nearly every real input
 # unsure: human-style test paragraphs scored 0.37–0.51 and AI-style ones
-# 0.62–0.67, so the system was "unsure about everything" and its human and
-# AI labels were nearly unreachable in practice. The new band sits in the
-# observed gap between the two clusters, so clear cases get decided and only
-# genuinely intermediate scores stay unsure. The trade, measured in the
+# 0.62–0.67, so the system was unsure on most evaluation inputs. The new
+# band sits in the observed gap between the two clusters, so more test cases
+# get decided. It does not make the labels reliable on real writers. The
+# trade, measured in the
 # after-run: decisiveness rises, but so do false positives (FP02) and
 # successful evasions (EV01) — narrowing the band helps every side.
 HUMAN_THRESHOLD = 0.50

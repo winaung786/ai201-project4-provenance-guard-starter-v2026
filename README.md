@@ -353,9 +353,26 @@ staff ZIP is available, extract it into its own folder, run the full set with
 its provenance, every outcome, diagnoses, and relevant audit entries. A new
 after-run is needed if a later change is made in response to that set.
 
-The criteria table below reports the recorded local evaluation. Criterion 4
+The criteria tables below report the recorded local evaluation. Criterion 4
 was checked manually once before and once after the threshold change, not in
-three trials at either point. Its three-trial target remains unverified.
+three trials at either point. The historical three-trial claim was therefore
+unverified. A new isolated route test now checks three appeal/unknown-ID
+trials with a fixed stand-in detector score; it verifies the appeal and audit
+behavior, not a live GPT-2 run.
+
+On 2026-11-04, `python -m unittest discover -s tests -v` passed all seven
+focused tests using Python 3.13 and the Flask dependencies. They cover the
+rate limit, rejections, nine decision fields, three appeal trials, large CSV
+fields, non-object JSON preview, parse-gap refusal, and report score labels.
+The model-backed service and staff attack ZIP were not run in this check.
+
+| Criterion | Recorded after-run | Current assessment |
+|---|---|---|
+| 1. False positives | 0/10 AI labels in each of three trials | MET on simulated human-style inputs; no real-writer error rate established |
+| 2. Score spread | 0.2017 in each trial vs 0.30 target | MISSED |
+| 3. Label coverage | `ai`, `human`, `ai` in each trial | MISSED: no `unsure` |
+| 4. Appeal path | One manual check after the change | Three new isolated route trials PASS; original live three-trial evidence is absent |
+| 5. Bad input | 400 for all four bodies in each trial | MET in the recorded run and confirmed by an isolated route test |
 
 ---
 
@@ -409,6 +426,10 @@ blocks retain the two signal scores from which they can be recomputed.
 Those historical reports are left intact; new reports use an explicitly
 named `Combined score` column beside `Confidence`.
 
+The `FP` cases are AI-written proxies for human-style prose. Their BROKE
+verdicts mean the model flagged those proxies as AI under the local judgment
+rule; they do not establish that any actual writer was falsely accused.
+
 Judgment rule for evasion, stated before the marks: an evasion counts as
 BROKE if it lands in the human band, or if it drags the combined score at
 least 0.20 toward human from the unattacked base text (0.6157). A label
@@ -448,15 +469,15 @@ cases cannot test the limit by themselves — that is what `--flood` is for.
 {"timestamp": "2026-10-28T23:11:44+00:00", "creator_id": "unknown", "status": "rejected", "event": "rejected", "reason": "invalid_json"}
 ```
 
-**The single worst local-test outcome** — the one I'd least want to explain to a writer
-whose work got caught by it:
+**The single worst local-test outcome** — the one that raises the clearest
+concern for a real writer with similar prose:
 
 FP01: simulated plain, simple human-style writing ("I go to work every day. I take
 the bus. The bus is slow...") labelled high-confidence AI at 0.709. The
 model signal scored it 0.9102 — short common words are maximally
 predictable — and the style signal (0.5085) did not pull it back. The
-writer this accuses is exactly the plain writer with the least room to
-argue back.
+result suggests a risk for plain writers who may have little room to argue
+back; it is not a measured error on a real writer.
 
 
 
@@ -533,8 +554,8 @@ the label mapping.
   rule.** Short common words are maximally predictable, so the model signal
   scored plain simple prose 0.9102; the style signal (0.5085) did not pull
   it back, and the 0.5 weight let combined cross the AI threshold at
-  0.7093. The writers this signal is most likely to accuse are the ones
-  with the least room to argue back — that is structural, not a bug.
+  0.7093. A real plain-language writer could face the same error. The
+  proxy result shows a structural risk, not a measured real-writer rate.
 - **Criterion 2 spread (MISSED) — stages: both signals + combining rule.**
   The model gap between the two test groups is only 0.24 (AI-style mean
   0.8786 vs human-style mean 0.6377) and the style gap 0.16. A weighted
@@ -570,10 +591,10 @@ was updated to the new ranges.
 **Which diagnosis pointed at it:**
 
 The label-mapping diagnosis behind criterion 3: the original 0.35/0.65
-band left nearly every real input unsure, because human-style test scores
+band left nearly every evaluation input unsure, because human-style test scores
 (0.37–0.51) and AI-style scores (0.62–0.67) both sat inside it. The new
 band sits in the observed gap between the two clusters, so clear cases get
-decided and only genuinely intermediate scores stay unsure.
+decided and scores between 0.50 and 0.60 stay unsure.
 
 ### Attack Run — After
 
@@ -631,8 +652,8 @@ bought decisiveness and paid for it in false positives and evasions.
   rather than surface shape. Why I stopped: that is a third signal, which is
   a new build, not a fix — and the unit asks for one improvement, honestly
   measured, not a rebuild.
-- **FP01/FP02 false positives.** Plain simple prose and second-language
-  plain prose are labelled AI (0.709, 0.623). What I'd do: calibrate the
+- **FP01/FP02 proxy false positives.** Simulated plain simple prose and
+  second-language prose are labelled AI (0.709, 0.623). What I'd do: calibrate the
   model signal's midpoint against plain human writing specifically, or add
   a human-review gate before any high-confidence AI label is shown to a
   reader. Why I stopped: moving the model midpoint means editing
