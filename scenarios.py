@@ -22,11 +22,8 @@ A scenario carries **either** of these:
               field at all, something enormous. A bad-input criterion needs it,
               because you cannot express "the field is missing" as a string.
 
-Criterion 4 (the appeal path) has no scenario here: an appeal needs a
-submission first and then an appeal against the content_id that came back,
-which run_eval.py does not do. It is tested by hand (submit, appeal, read the
-log) and the evidence is pasted into README.md. Saying which was done by hand
-is part of the write-up.
+The appeal scenario follows a live submission through /appeal and /log.
+The bad-input scenario also checks /log for the corresponding rejections.
 """
 
 # --- Human-style test paragraphs (evaluation test inputs) -------------------
@@ -182,8 +179,15 @@ SCENARIOS = [
         ],
     },
     {
+        "name": "appeal path",
+        "criterion": 4,
+        "texts": [HUMAN_STYLE[0]],
+        "check": "appeal",
+    },
+    {
         "name": "bad input",
         "criterion": 5,
+        "check": "rejections",
         # Raw request bodies, sent exactly as written.
         "bodies": [
             {"text": "", "creator_id": "eval_bad_empty"},

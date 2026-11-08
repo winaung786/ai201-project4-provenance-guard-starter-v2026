@@ -13,8 +13,7 @@ Fill in `scenarios.py` first — that's where you say what each criterion needs
 run against it. A criterion about false positives needs your own writing. One
 about label coverage needs inputs across the score range.
 
-!! Three trials, and **your first signal runs a model, so identical input can
-score differently twice.** That's exactly why repeats matter here.
+Three trials repeat the same inputs and check the complete response paths.
 
 This does the sending and the recording. It does not decide whether a trial
 passed — that depends on the criterion you wrote, so the Verdict column comes
@@ -25,7 +24,7 @@ import argparse
 import datetime as dt
 import json
 import sys
-from pathlib import Path
+from uuid import uuid4
 
 import config
 
@@ -66,6 +65,65 @@ def describe(body):
     return json.dumps(body)[:120]
 
 
+def exchange(session, method, url, path, timeout, body=None):
+    """Preserve the HTTP status and actual JSON, including rejection details."""
+    response = session.request(method, f"{url}{path}", json=body, timeout=timeout)
+    try:
+        return {"status": response.status_code, "response": response.json()}
+    except ValueError:
+        return {"status": response.status_code, "error": response.text[:200]}
+
+
+def entries(session, url, timeout):
+    result = exchange(session, "GET", url, "/log", timeout)
+    if result["status"] != 200 or "response" not in result:
+        raise ValueError(f"/log failed: {result}")
+    return result["response"]["entries"]
+
+
+def appeal_evidence(session, url, timeout, submission):
+    content_id = submission.get("response", {}).get("content_id")
+    if not content_id:
+        return {}
+
+    def history():
+        return [entry for entry in entries(session, url, timeout)
+                if entry.get("content_id") == content_id]
+
+    original = history()
+    appeal = exchange(session, "POST", url, "/appeal", timeout, {
+        "content_id": content_id, "reasoning": "Please review this test decision.",
+    })
+    unknown = exchange(session, "POST", url, "/appeal", timeout, {
+        "content_id": f"unknown-{uuid4().hex}",
+    })
+    return {"original_history": original, "appeal": appeal,
+            "unknown_appeal": unknown, "final_history": history()}
+
+
+def run_trial(session, url, timeout, scenario):
+    check = scenario.get("check")
+    if check == "rejections":
+        log_offset = len(entries(session, url, timeout))
+
+    results = []
+    for body in bodies_for(scenario):
+        try:
+            result = exchange(session, "POST", url, "/submit", timeout, body)
+            if check == "appeal":
+                result.update(appeal_evidence(session, url, timeout, result))
+        except Exception as exc:  # noqa: BLE001 — record and continue the trial
+            result = {"status": None, "error": f"{type(exc).__name__}: {exc}"}
+        results.append({"sent": describe(body), **result})
+
+    if check == "rejections":
+        new_entries = entries(session, url, timeout)[log_offset:]
+        for body, result in zip(bodies_for(scenario), results):
+            result["audit_entries"] = [entry for entry in new_entries
+                                       if entry.get("creator_id") == body["creator_id"]]
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -96,8 +154,9 @@ def main():
             print(f"  - {problem}", file=sys.stderr)
         sys.exit(1)
 
+    session = requests.Session()
     try:
-        requests.get(f"{args.url}/health", timeout=5)
+        session.get(f"{args.url}/health", timeout=5).raise_for_status()
     except Exception:  # noqa: BLE001
         print(f"Nothing answering at {args.url}. Start it:  python app.py",
               file=sys.stderr)
@@ -112,28 +171,10 @@ def main():
 
         trials = []
         for trial in range(1, args.trials + 1):
-            results = []
-            for i, body in enumerate(bodies_for(scenario), 1):
-                preview = describe(body)
-                try:
-                    response = requests.post(f"{args.url}/submit", json=body,
-                                             timeout=args.timeout)
-                    payload = response.json() if response.content else {}
-                    results.append({
-                        "status": response.status_code,
-                        "guess": payload.get("guess"),
-                        "confidence": payload.get("confidence"),
-                        "model_score": payload.get("model_score"),
-                        "style_score": payload.get("style_score"),
-                        "label": payload.get("label"),
-                        "sent": preview,
-                    })
-                except Exception as exc:  # noqa: BLE001
-                    results.append({"status": None, "error": f"{type(exc).__name__}: {exc}",
-                                    "sent": preview})
-
+            results = run_trial(session, args.url, args.timeout, scenario)
             trials.append(results)
-            guesses = [r.get("guess") or "—" for r in results]
+            guesses = [r.get("response", {}).get("guess") or str(r["status"])
+                       for r in results]
             print(f"  trial {trial}: {', '.join(guesses)}")
 
         rows.append({"scenario": scenario, "trials": trials})

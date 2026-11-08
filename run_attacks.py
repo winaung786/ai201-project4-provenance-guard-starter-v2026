@@ -502,6 +502,7 @@ def main():
             "model_score": payload.get("model_score"),
             "style_score": payload.get("style_score"),
             "label": payload.get("label"),
+            "response": payload,
             "error": error,
             "verdict": verdict,
             "note": note,
